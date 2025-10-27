@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Room Model with Material Changer</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a2a6c, #2c3e50);
+      color: white;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      text-align: center;
+      padding: 20px;
+      background: rgba(0, 0, 0, 0.4);
+      z-index: 10;
+    }
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+      background: linear-gradient(to right, #ff7e5f, #feb47b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      font-size: 1.2rem;
+      max-width: 800px;
+      margin: 0 auto;
+      color: #e0e0e0;
+    }
+    #canvas-container {
+      flex: 1;
+      position: relative;
+    }
+    #instructions {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.6);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0.8;
+      z-index: 10;
+    }
+    #material-bar {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 12px;
+      border-radius: 20px;
+      backdrop-filter: blur(5px);
+      z-index: 10;
+    }
+    .material-swatch {
+      width: 60px;
+      height: 60px;
+      border: 2px solid transparent;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      outline: none;
+      position: relative;
+      overflow: hidden;
+    }
+    .material-swatch:focus,
+    .material-swatch:hover {
+      border-color: #fff;
+      transform: scale(1.05);
+      box-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+    }
+    .material-swatch:active {
+      transform: scale(0.98);
+    }
+    .material-swatch::after {
+      content: attr(data-label);
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      font-size: 10px;
+      padding: 2px;
+      text-align: center;
+    }
+    #toast {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(200, 0, 0, 0.8);
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+      z-index: 10;
+    }
+    #toast.show {
+      opacity: 1;
+    }
+    .controls-info {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 10px 15px;
+      border-radius: 10px;
+      font-size: 14px;
+      z-index: 10;
+    }
+    .footer {
+      text-align: center;
+      padding: 15px;
+      background: rgba(0, 0, 0, 0.4);
+      font-size: 0.9rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>3D Room Model with Material Changer</h1>
+    <p class="subtitle">Explore a virtual room with interactive floor material options. Click on material swatches to change the floor texture.</p>
+  </div>
+  
+  <div id="canvas-container"></div>
+  
+  <div id="instructions">Click material to change floor | Drag to rotate | Scroll to zoom</div>
+  
+  <div id="material-bar">
+    <button class="material-swatch" 
+            data-url="https://images.unsplash.com/photo-1505692794400-6b8c8b9f7fd2?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+            data-label="Wood"
+            aria-label="Wood floor material">
+    </button>
+    <button class="material-swatch" 
+            data-url="https://images.unsplash.com/photo-1496307042754-b4aa456c4a2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+            data-label="Concrete"
+            aria-label="Concrete floor material">
+    </button>
+    <button class="material-swatch" 
+            data-url="https://images.unsplash.com/photo-1549893073-3fc1d1b5f8c0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+            data-label="Marble"
+            aria-label="Marble floor material">
+    </button>
+    <button class="material-swatch" 
+            data-url="https://images.unsplash.com/photo-1588854337113-6f42b6ee7b24?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+            data-label="Carpet"
+            aria-label="Carpet floor material">
+    </button>
+    <button class="material-swatch" 
+            data-url="https://images.unsplash.com/photo-1578632749014-ca77efd08846?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
+            data-label="Tiles"
+            aria-label="Tiles floor material">
+    </button>
+  </div>
+  
+  <div id="toast">Failed to load texture</div>
+  
+  <div class="controls-info">
+    <p>Left Click + Drag: Rotate View</p>
+    <p>Scroll: Zoom In/Out</p>
+    <p>Right Click + Drag: Pan View</p>
+  </div>
+  
+  <div class="footer">
+    <p>Created with Three.js | 3D Room Model | Interactive Material Changer</p>
+  </div>
+
+  <!-- Load Three.js and OrbitControls from CDN -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.152.2/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.152.2/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // Main variables
+    let scene, camera, renderer, controls;
+    let floorMesh;
+    let currentTexture = null;
+    let isAnimating = false;
+    let isVisible = true;
+
+    // DOM elements
+    const container = document.getElementById('canvas-container');
+    const toast = document.getElementById('toast');
+    const swatches = document.querySelectorAll('.material-swatch');
+
+    // Initialize scene
+    function init() {
+      // Scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87CEEB); // Sky blue
+      scene.fog = new THREE.Fog(0x87CEEB, 10, 20);
+
+      // Camera
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 3, 8);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      // Controls
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.minDistance = 5;
+      controls.maxDistance = 15;
+      controls.maxPolarAngle = Math.PI / 2 - 0.1;
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      directionalLight.position.set(5, 10, 7);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 1024;
+      directionalLight.shadow.mapSize.height = 1024;
+      directionalLight.shadow.camera.near = 0.5;
+      directionalLight.shadow.camera.far = 20;
+      directionalLight.shadow.camera.left = -10;
+      directionalLight.shadow.camera.right = 10;
+      directionalLight.shadow.camera.top = 10;
+      directionalLight.shadow.camera.bottom = -10;
+      scene.add(directionalLight);
+
+      // Add a subtle point light for better illumination
+      const pointLight = new THREE.PointLight(0xffffff, 0.5);
+      pointLight.position.set(0, 5, 0);
+      scene.add(pointLight);
+
+      // Room geometry
+      const roomWidth = 10;
+      const roomDepth = 6;
+      const roomHeight = 4;
+
+      // Floor
+      const floorGeometry = new THREE.PlaneGeometry(roomWidth, roomDepth);
+      const floorMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xaaaaaa,
+        roughness: 0.8,
+        metalness: 0.2
+      });
+      floorMesh = new THREE.Mesh(floorGeometry, floorMaterial);
+      floorMesh.rotation.x = -Math.PI / 2;
+      floorMesh.position.y = 0;
+      floorMesh.receiveShadow = true;
+      scene.add(floorMesh);
+
+      // Walls
+      const wallMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0xf0f0f0,
+        roughness: 0.9,
+        metalness: 0.1
+      });
+
+      // Back wall
+      const backWall = new THREE.Mesh(
+        new THREE.PlaneGeometry(roomWidth, roomHeight),
+        wallMaterial
+      );
+      backWall.position.z = -roomDepth / 2;
+      backWall.position.y = roomHeight / 2;
+      backWall.receiveShadow = true;
+      scene.add(backWall);
+
+      // Front wall (invisible but for shadow)
+      const frontWall = new THREE.Mesh(
+        new THREE.PlaneGeometry(roomWidth, roomHeight),
+        new THREE.MeshStandardMaterial({ color: 0x000000, transparent: true, opacity: 0 })
+      );
+      frontWall.position.z = roomDepth / 2;
+      frontWall.position.y = roomHeight / 2;
+      frontWall.rotation.y = Math.PI;
+      scene.add(frontWall);
+
+      // Left wall
+      const leftWall = new THREE.Mesh(
+        new THREE.PlaneGeometry(roomDepth, roomHeight),
+        wallMaterial
+      );
+      leftWall.position.x = -roomWidth / 2;
+      leftWall.position.y = roomHeight / 2;
+      leftWall.rotation.y = Math.PI / 2;
+      leftWall.receiveShadow = true;
+      scene.add(leftWall);
+
+      // Right wall
+      const rightWall = new THREE.Mesh(
+        new THREE.PlaneGeometry(roomDepth, roomHeight),
+        wallMaterial
+      );
+      rightWall.position.x = roomWidth / 2;
+      rightWall.position.y = roomHeight / 2;
+      rightWall.rotation.y = -Math.PI / 2;
+      rightWall.receiveShadow = true;
+      scene.add(rightWall);
+
+      // Ceiling
+      const ceiling = new THREE.Mesh(
+        new THREE.PlaneGeometry(roomWidth, roomDepth),
+        new THREE.MeshStandardMaterial({ color: 0xe0e0e0 })
+      );
+      ceiling.position.y = roomHeight;
+      ceiling.rotation.x = Math.PI / 2;
+      ceiling.receiveShadow = true;
+      scene.add(ceiling);
+
+      // Add furniture to the room
+      addFurniture(roomWidth, roomDepth, roomHeight);
+
+      // Set up event listeners
+      window.addEventListener('resize', onWindowResize);
+      document.addEventListener('visibilitychange', () => {
+        isVisible = !document.hidden;
+      });
+
+      // Set initial texture (wood)
+      const initialUrl = swatches[0].dataset.url;
+      loadTexture(initialUrl).then(texture => {
+        applyTexture(texture);
+        // Set swatch background after load
+        const img = new Image();
+        img.onload = () => {
+          swatches[0].style.backgroundImage = `url(${initialUrl})`;
+          swatches[0].style.backgroundSize = 'cover';
+        };
+        img.src = initialUrl;
+      }).catch(() => {
+        showLoadError();
+      });
+
+      // Set swatch backgrounds
+      swatches.forEach(swatch => {
+        const url = swatch.dataset.url;
+        swatch.style.backgroundImage = `url(${url})`;
+        swatch.style.backgroundSize = 'cover';
+        swatch.addEventListener('click', () => handleSwatchClick(url));
+      });
+
+      // Start animation loop
+      animate();
+    }
+
+    // Add furniture to the room
+    function addFurniture(roomWidth, roomDepth, roomHeight) {
+      // Sofa
+      const sofaGroup = new THREE.Group();
+      const sofaSeatGeometry = new THREE.BoxGeometry(3, 0.5, 1.5);
+      const sofaSeatMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+      const sofaSeat = new THREE.Mesh(sofaSeatGeometry, sofaSeatMaterial);
+      sofaSeat.position.y = 0.25;
+      sofaGroup.add(sofaSeat);
+
+      const sofaBackGeometry = new THREE.BoxGeometry(3, 1, 0.2);
+      const sofaBack = new THREE.Mesh(sofaBackGeometry, sofaSeatMaterial);
+      sofaBack.position.y = 1;
+      sofaBack.position.z = -0.65;
+      sofaGroup.add(sofaBack);
+
+      const sofaArmGeometry = new THREE.BoxGeometry(0.2, 0.8, 1.5);
+      const sofaArm1 = new THREE.Mesh(sofaArmGeometry, sofaSeatMaterial);
+      sofaArm1.position.x = 1.4;
+      sofaArm1.position.y = 0.6;
+      sofaGroup.add(sofaArm1);
+
+      const sofaArm2 = new THREE.Mesh(sofaArmGeometry, sofaSeatMaterial);
+      sofaArm2.position.x = -1.4;
+      sofaArm2.position.y = 0.6;
+      sofaGroup.add(sofaArm2);
+
+      sofaGroup.position.set(-2, 0.5, -1);
+      sofaGroup.rotation.y = Math.PI / 2;
+      scene.add(sofaGroup);
+
+      // Coffee Table
+      const tableTopGeometry = new THREE.BoxGeometry(1.5, 0.1, 0.8);
+      const tableTopMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50 });
+      const tableTop = new THREE.Mesh(tableTopGeometry, tableTopMaterial);
+      tableTop.position.y = 0.5;
+      tableTop.castShadow = true;
+
+      const legGeometry = new THREE.BoxGeometry(0.1, 0.8, 0.1);
+      const leg1 = new THREE.Mesh(legGeometry, tableTopMaterial);
+      leg1.position.set(0.65, 0.4, 0.3);
+      const leg2 = new THREE.Mesh(legGeometry, tableTopMaterial);
+      leg2.position.set(-0.65, 0.4, 0.3);
+      const leg3 = new THREE.Mesh(legGeometry, tableTopMaterial);
+      leg3.position.set(0.65, 0.4, -0.3);
+      const leg4 = new THREE.Mesh(legGeometry, tableTopMaterial);
+      leg4.position.set(-0.65, 0.4, -0.3);
+
+      const tableGroup = new THREE.Group();
+      tableGroup.add(tableTop);
+      tableGroup.add(leg1);
+      tableGroup.add(leg2);
+      tableGroup.add(leg3);
+      tableGroup.add(leg4);
+      tableGroup.position.set(-2, 0, -0.5);
+      scene.add(tableGroup);
+
+      // Plant
+      const plantGroup = new THREE.Group();
+      const potGeometry = new THREE.CylinderGeometry(0.3, 0.4, 0.5, 16);
+      const potMaterial = new THREE.MeshStandardMaterial({ color: 0x7f8c8d });
+      const pot = new THREE.Mesh(potGeometry, potMaterial);
+      pot.position.y = 0.25;
+      plantGroup.add(pot);
+
+      const plantGeometry = new THREE.SphereGeometry(0.4, 8, 8);
+      const plantMaterial = new THREE.MeshStandardMaterial({ color: 0x27ae60 });
+      const plant = new THREE.Mesh(plantGeometry, plantMaterial);
+      plant.position.y = 0.7;
+      plantGroup.add(plant);
+
+      plantGroup.position.set(3, 0, 1.5);
+      scene.add(plantGroup);
+
+      // Lamp
+      const lampGroup = new THREE.Group();
+      const lampBaseGeometry = new THREE.CylinderGeometry(0.1, 0.1, 1, 16);
+      const lampBaseMaterial = new THREE.MeshStandardMaterial({ color: 0x95a5a6 });
+      const lampBase = new THREE.Mesh(lampBaseGeometry, lampBaseMaterial);
+      lampBase.position.y = 0.5;
+      lampGroup.add(lampBase);
+
+      const lampShaftGeometry = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 16);
+      const lampShaft = new THREE.Mesh(lampShaftGeometry, lampBaseMaterial);
+      lampShaft.position.y = 1.25;
+      lampGroup.add(lampShaft);
+
+      const lampHeadGeometry = new THREE.CylinderGeometry(0.2, 0.3, 0.3, 16);
+      const lampHeadMaterial = new THREE.MeshStandardMaterial({ color: 0xf1c40f });
+      const lampHead = new THREE.Mesh(lampHeadGeometry, lampHeadMaterial);
+      lampHead.position.y = 1.9;
+      lampHead.rotation.x = Math.PI / 2;
+      lampGroup.add(lampHead);
+
+      lampGroup.position.set(3, 0, -2);
+      scene.add(lampGroup);
+
+      // Bookshelf
+      const shelfGroup = new THREE.Group();
+      const shelfGeometry = new THREE.BoxGeometry(1.2, 0.05, 0.3);
+      const shelfMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+      
+      for (let i = 0; i < 4; i++) {
+        const shelf = new THREE.Mesh(shelfGeometry, shelfMaterial);
+        shelf.position.y = i * 0.4 + 0.2;
+        shelfGroup.add(shelf);
+      }
+
+      const sideGeometry = new THREE.BoxGeometry(0.05, 1.5, 0.3);
+      const side1 = new THREE.Mesh(sideGeometry, shelfMaterial);
+      side1.position.x = 0.575;
+      side1.position.y = 0.75;
+      shelfGroup.add(side1);
+
+      const side2 = new THREE.Mesh(sideGeometry, shelfMaterial);
+      side2.position.x = -0.575;
+      side2.position.y = 0.75;
+      shelfGroup.add(side2);
+
+      shelfGroup.position.set(3, 0, 0);
+      scene.add(shelfGroup);
+    }
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    function loadTexture(url) {
+      return new Promise((resolve, reject) => {
+        const loader = new THREE.TextureLoader();
+        loader.load(
+          url,
+          texture => {
+            // Configure texture
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(4, 4);
+            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+            resolve(texture);
+          },
+          undefined, // onProgress
+          () => reject(new Error('Failed to load texture'))
+        );
+      });
+    }
+
+    function applyTexture(newTexture) {
+      if (currentTexture) {
+        currentTexture.dispose();
+      }
+      currentTexture = newTexture;
+      floorMesh.material.map = newTexture;
+      floorMesh.material.needsUpdate = true;
+    }
+
+    function handleSwatchClick(url) {
+      if (isAnimating) return;
+      isAnimating = true;
+
+      loadTexture(url)
+        .then(texture => {
+          // Fade out current material
+          const originalRoughness = floorMesh.material.roughness;
+          const fadeOut = () => {
+            if (floorMesh.material.roughness > 1) {
+              requestAnimationFrame(fadeOut);
+              floorMesh.material.roughness += 0.05;
+              floorMesh.material.metalness = Math.max(0, floorMesh.material.metalness - 0.02);
+              return;
+            }
+            // Apply new texture and fade in
+            applyTexture(texture);
+            const fadeIn = () => {
+              if (floorMesh.material.roughness > originalRoughness) {
+                requestAnimationFrame(fadeIn);
+                floorMesh.material.roughness -= 0.05;
+                floorMesh.material.metalness = Math.min(0.2, floorMesh.material.metalness + 0.02);
+                return;
+              }
+              isAnimating = false;
+            };
+            fadeIn();
+          };
+          fadeOut();
+        })
+        .catch(() => {
+          showLoadError();
+          isAnimating = false;
+        });
+    }
+
+    function showLoadError() {
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3000);
+    }
+
+    function animate() {
+      if (!isVisible) {
+        // Pause rendering when tab is hidden
+        setTimeout(() => requestAnimationFrame(animate), 100);
+        return;
+      }
+
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Initialize the scene
+    init();
+  </script>
+</body>
+</html>
